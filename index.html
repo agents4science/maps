@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Globus Transfers Around the World</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.css">
+<style>
+  :root {
+    --bg: #0b1026; --card: #151b3b; --accent: #38bdf8; --accent2: #f472b6;
+    --text: #e2e8f0; --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif; }
+  header { text-align: center; padding: 42px 16px 10px; }
+  header h1 { font-size: 2.3rem; margin: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header p { color: var(--muted); max-width: 640px; margin: 10px auto; }
+  .counters { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin: 22px 0; }
+  .counter { text-align: center; }
+  .counter .num { font-size: 2rem; font-weight: 700; color: var(--accent);
+                  font-variant-numeric: tabular-nums; }
+  .counter .lbl { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+  .featured { display: flex; justify-content: center; margin: 8px 0 20px; }
+  .featured button { background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border: 0; color: #08101f; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
+    border-radius: 999px; cursor: pointer; transition: transform .15s; }
+  .featured button:hover { transform: scale(1.06); }
+  #map { width: min(1050px, 94vw); height: 520px; margin: 0 auto; }
+  .hint { text-align: center; color: var(--muted); font-size: .85rem; margin: 6px 0 30px; }
+  .search { display: flex; justify-content: center; margin: 10px 0 18px; }
+  .search input { width: min(420px, 80vw); padding: 11px 18px; border-radius: 999px;
+    border: 1px solid #2b355f; background: var(--card); color: var(--text); font-size: 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: 12px; width: min(1100px, 94vw); margin: 0 auto 60px; }
+  .card { background: var(--card); border-radius: 12px; padding: 12px; cursor: pointer;
+    text-align: center; border: 1px solid transparent; transition: transform .12s, border-color .12s; }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card img { width: 56px; height: 38px; object-fit: cover; border-radius: 4px; }
+  .card .cname { font-weight: 600; margin: 6px 0 2px; font-size: .92rem; }
+  .card .cstats { color: var(--muted); font-size: .78rem; }
+  dialog { border: 0; border-radius: 14px; background: var(--card); color: var(--text);
+    width: min(960px, 94vw); padding: 0; }
+  dialog::backdrop { background: rgba(3, 6, 20, 0.85); }
+  .dlg-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; }
+  .dlg-head img { width: 44px; height: 30px; border-radius: 3px; }
+  .dlg-head h2 { margin: 0; font-size: 1.2rem; flex: 1; }
+  .dlg-head button { background: none; border: 0; color: var(--muted); font-size: 1.6rem; cursor: pointer; }
+  dialog video { width: 100%; display: block; background: #000; }
+  .dlg-stats { padding: 10px 18px 16px; color: var(--muted); font-size: .9rem; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 26px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Globus Transfers Around the World</h1>
+  <p>Fifteen years of research data on the move &mdash; <span id="hdr-sub">loading&hellip;</span>.
+     Click a country on the map (or a card below) to watch its transfers unfold, month by month,
+     as points of transfer size vs. distance and routes on the globe.</p>
+</header>
+
+<div class="counters">
+  <div class="counter"><div class="num" id="c-transfers">0</div><div class="lbl">Transfers</div></div>
+  <div class="counter"><div class="num" id="c-bytes">0</div><div class="lbl">Moved</div></div>
+  <div class="counter"><div class="num" id="c-countries">0</div><div class="lbl">Countries</div></div>
+</div>
+
+<div class="featured">
+  <button id="btn-all">&#127757; Watch the Whole World</button>
+</div>
+
+<div id="map"></div>
+<p class="hint">Countries shaded by total data volume moved (log scale). Brighter = more bytes.</p>
+
+<div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
+<div class="grid" id="grid"></div>
+
+<dialog id="dlg">
+  <div class="dlg-head">
+    <img id="dlg-flag" alt="" style="display:none">
+    <h2 id="dlg-title"></h2>
+    <button id="dlg-close" aria-label="Close">&times;</button>
+  </div>
+  <video id="dlg-video" controls autoplay playsinline></video>
+  <div class="dlg-stats" id="dlg-stats"></div>
+</dialog>
+
+<footer>
+  Data: Globus transfer logs, July 2010 &ndash; November 2025. Distances are great-circle;
+  locations are IP-level geolocation. Made with <a href="https://globus.org">Globus</a> usage data.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/maps/world.js"></script>
+<script>
+const fmtBytes = b => {
+  const u = [['EB',1e18],['PB',1e15],['TB',1e12],['GB',1e9],['MB',1e6]];
+  for (const [s,v] of u) if (b >= v) return (b/v).toFixed(b/v < 10 ? 1 : 0) + ' ' + s;
+  return b + ' B';
+};
+const fmtNum = n => n >= 1e6 ? (n/1e6).toFixed(1) + 'M' : n.toLocaleString();
+
+fetch('manifest.json').then(r => r.json()).then(M => {
+  const codes = Object.keys(M).filter(c => c !== 'ALL');
+  const totalTransfers = 59440629;            // all rows in the dataset
+
+  // Animated counters
+  const animate = (el, target, fmt) => {
+    const t0 = performance.now(), dur = 1800;
+    const step = t => {
+      const p = Math.min((t - t0) / dur, 1), eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(Math.round(target * eased));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  animate(document.getElementById('c-transfers'), totalTransfers, fmtNum);
+  animate(document.getElementById('c-bytes'), 3.57e18, fmtBytes);
+  animate(document.getElementById('c-countries'), codes.length, n => n);
+  document.getElementById('hdr-sub').textContent =
+    `${fmtNum(totalTransfers)} transfers between ${codes.length} countries`;
+
+  // Modal player
+  const dlg = document.getElementById('dlg');
+  const video = document.getElementById('dlg-video');
+  const play = code => {
+    const e = M[code];
+    if (!e) return;
+    document.getElementById('dlg-title').textContent = e.name;
+    const flag = document.getElementById('dlg-flag');
+    if (e.flag) { flag.src = `flags/${code}.png`; flag.style.display = ''; }
+    else flag.style.display = 'none';
+    document.getElementById('dlg-stats').textContent = code === 'ALL'
+      ? 'Every geolocated transfer, July 2010 – November 2025.'
+      : e.transfers > 0
+        ? `${fmtNum(e.transfers)} transfers involving ${e.name} · ${fmtBytes(e.bytes)} moved`
+        : 'Monthly transfers, July 2010 – November 2025.';
+    video.src = `videos/${code}.mp4`;
+    dlg.showModal();
+  };
+  document.getElementById('dlg-close').onclick = () => dlg.close();
+  dlg.onclose = () => { video.pause(); video.removeAttribute('src'); video.load(); };
+  dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
+  document.getElementById('btn-all').onclick = () => play('ALL');
+
+  // Choropleth world map
+  const values = {};
+  codes.forEach(c => { if (M[c].bytes > 0) values[c] = Math.log10(M[c].bytes); });
+  new jsVectorMap({
+    selector: '#map', map: 'world', backgroundColor: 'transparent',
+    zoomButtons: true, zoomOnScroll: false,
+    regionStyle: { initial: { fill: '#1e2a52' }, hover: { fill: '#38bdf8' } },
+    visualizeData: { scale: ['#223067', '#f472b6'], values },
+    onRegionTooltipShow(event, tooltip, code) {
+      const e = M[code];
+      tooltip.text(e ? `${e.name}: ${fmtBytes(e.bytes)} — click to watch`
+                     : `${tooltip.text()}: no recorded transfers`);
+    },
+    onRegionClick(event, code) { play(code); },
+  });
+
+  // Searchable card grid, largest movers first
+  const grid = document.getElementById('grid');
+  const sorted = codes.sort((a, b) => M[b].bytes - M[a].bytes);
+  sorted.forEach(code => {
+    const e = M[code];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.name = (e.name + ' ' + code).toLowerCase();
+    card.innerHTML = `${e.flag ? `<img loading="lazy" src="flags/${code}.png" alt="">` : '&#127988;'}
+      <div class="cname">${e.name}</div>
+      <div class="cstats">${fmtNum(e.transfers)} transfers &middot; ${fmtBytes(e.bytes)}</div>`;
+    card.onclick = () => play(code);
+    grid.appendChild(card);
+  });
+  document.getElementById('q').oninput = ev => {
+    const q = ev.target.value.toLowerCase();
+    for (const card of grid.children)
+      card.style.display = card.dataset.name.includes(q) ? '' : 'none';
+  };
+});
+</script>
+</body>
+</html>
