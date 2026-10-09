@@ -41,6 +41,17 @@
   .card img { width: 56px; height: 38px; object-fit: cover; border-radius: 4px; }
   .card .cname { font-weight: 600; margin: 6px 0 2px; font-size: .92rem; }
   .card .cstats { color: var(--muted); font-size: .78rem; }
+  .figs { width: min(1100px, 94vw); margin: 0 auto 60px; }
+  .figs h2 { text-align: center; font-size: 1.7rem; margin: 10px 0 8px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .figs > p { text-align: center; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+  .fig { margin: 0 0 36px; }
+  .fig img { width: 100%; display: block; border-radius: 12px; border: 1px solid #2b355f;
+    cursor: zoom-in; }
+  .fig figcaption { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 8px; }
+  #dlg-img { width: min(1500px, 96vw); background: var(--bg); }
+  #dlg-img img { width: 100%; display: block; cursor: zoom-out; }
   dialog { border: 0; border-radius: 14px; background: var(--card); color: var(--text);
     width: min(960px, 94vw); padding: 0; }
   dialog::backdrop { background: rgba(3, 6, 20, 0.85); }
@@ -78,6 +89,33 @@
 <div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
 <div class="grid" id="grid"></div>
 
+<section class="figs">
+  <h2>The Numbers Behind the Maps</h2>
+  <p>Fifteen years of transfers, summed up: who exchanges data with whom, and who
+     moves the most for their size. Click a figure to enlarge.</p>
+  <figure class="fig">
+    <img src="figures/top30_pairs_transfers.png" loading="lazy"
+         alt="Heatmap of the number of transfers between the 30 most active countries">
+    <figcaption>Number of transfers between the 30 most active countries, source to
+      destination (log color scale). The diagonal is within-country traffic.</figcaption>
+  </figure>
+  <figure class="fig">
+    <img src="figures/top30_pairs_bytes.png" loading="lazy"
+         alt="Heatmap of data volume between the 30 largest-volume countries">
+    <figcaption>Data volume moved between the 30 largest-volume countries (log color
+      scale). Rankings shift versus transfer counts: a few very large datasets can
+      outweigh millions of small transfers.</figcaption>
+  </figure>
+  <figure class="fig">
+    <img src="figures/per_capita.png" loading="lazy"
+         alt="Bar charts of data moved per person and transfers per 1000 people, by country">
+    <figcaption>Transfers scaled by population: gigabytes moved per person and transfers
+      per 1000 people (World Bank 2023 populations, log scales).</figcaption>
+  </figure>
+</section>
+
+<dialog id="dlg-img"><img id="dlg-img-full" alt=""></dialog>
+
 <dialog id="dlg">
   <div class="dlg-head">
     <img id="dlg-flag" alt="" style="display:none">
@@ -96,6 +134,17 @@
 <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/maps/world.js"></script>
 <script>
+// Figure lightbox
+{
+  const idlg = document.getElementById('dlg-img');
+  const ifull = document.getElementById('dlg-img-full');
+  document.querySelectorAll('.fig img').forEach(im => im.onclick = () => {
+    ifull.src = im.src;
+    idlg.showModal();
+  });
+  idlg.onclick = () => idlg.close();
+}
+
 const fmtBytes = b => {
   const u = [['EB',1e18],['PB',1e15],['TB',1e12],['GB',1e9],['MB',1e6]];
   for (const [s,v] of u) if (b >= v) return (b/v).toFixed(b/v < 10 ? 1 : 0) + ' ' + s;
