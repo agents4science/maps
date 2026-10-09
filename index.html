@@ -7,12 +7,19 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.css">
 <style>
   :root {
-    --bg: #0b1026; --card: #151b3b; --accent: #38bdf8; --accent2: #f472b6;
-    --text: #e2e8f0; --muted: #94a3b8;
+    /* globus.org palette: navy header #244b8b, primary blue #0074af */
+    --bg: #ffffff; --card: #f4f8fb; --accent: #0074af; --accent2: #244b8b;
+    --text: #212529; --muted: #6e6e6e; --navy: #244b8b; --line: #d9e2ec;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif; }
+  .brandbar { display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; background: var(--navy); padding: 10px 24px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .brand img { height: 36px; }
+  .brand-name { color: #fff; font-size: 1.55rem; font-weight: 700; letter-spacing: .5px; }
+  .brand-tag { color: #cfe0f5; font-size: .85rem; }
   header { text-align: center; padding: 42px 16px 10px; }
   header h1 { font-size: 2.3rem; margin: 0;
     background: linear-gradient(90deg, var(--accent), var(--accent2));
@@ -25,18 +32,18 @@
   .counter .lbl { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
   .featured { display: flex; justify-content: center; margin: 8px 0 20px; }
   .featured button { background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border: 0; color: #08101f; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
+    border: 0; color: #fff; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
     border-radius: 999px; cursor: pointer; transition: transform .15s; }
   .featured button:hover { transform: scale(1.06); }
   #map { width: min(1050px, 94vw); height: 520px; margin: 0 auto; }
   .hint { text-align: center; color: var(--muted); font-size: .85rem; margin: 6px 0 30px; }
   .search { display: flex; justify-content: center; margin: 10px 0 18px; }
   .search input { width: min(420px, 80vw); padding: 11px 18px; border-radius: 999px;
-    border: 1px solid #2b355f; background: var(--card); color: var(--text); font-size: 1rem; }
+    border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 1rem; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
     gap: 12px; width: min(1100px, 94vw); margin: 0 auto 60px; }
   .card { background: var(--card); border-radius: 12px; padding: 12px; cursor: pointer;
-    text-align: center; border: 1px solid transparent; transition: transform .12s, border-color .12s; }
+    text-align: center; border: 1px solid var(--line); transition: transform .12s, border-color .12s; }
   .card:hover { transform: translateY(-3px); border-color: var(--accent); }
   .card img { width: 56px; height: 38px; object-fit: cover; border-radius: 4px; }
   .card .cname { font-weight: 600; margin: 6px 0 2px; font-size: .92rem; }
@@ -47,14 +54,15 @@
     -webkit-background-clip: text; background-clip: text; color: transparent; }
   .figs > p { text-align: center; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
   .fig { margin: 0 0 36px; }
-  .fig img { width: 100%; display: block; border-radius: 12px; border: 1px solid #2b355f;
+  .fig img { width: 100%; display: block; border-radius: 12px; border: 1px solid var(--line);
     cursor: zoom-in; }
   .fig figcaption { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 8px; }
   #dlg-img { width: min(1500px, 96vw); background: var(--bg); }
   #dlg-img img { width: 100%; display: block; cursor: zoom-out; }
   dialog { border: 0; border-radius: 14px; background: var(--card); color: var(--text);
     width: min(960px, 94vw); padding: 0; }
-  dialog::backdrop { background: rgba(3, 6, 20, 0.85); }
+  dialog::backdrop { background: rgba(15, 28, 55, 0.65); }
+  dialog { box-shadow: 0 10px 40px rgba(15, 28, 55, 0.35); }
   .dlg-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; }
   .dlg-head img { width: 44px; height: 30px; border-radius: 3px; }
   .dlg-head h2 { margin: 0; font-size: 1.2rem; flex: 1; }
@@ -66,6 +74,15 @@
 </style>
 </head>
 <body>
+<div class="brandbar">
+  <a class="brand" href="https://www.globus.org" target="_blank" rel="noopener">
+    <img src="logo_globus.svg" alt="Globus logo">
+    <span class="brand-name">globus</span>
+  </a>
+  <span class="brand-tag">a UChicago non-profit service &middot;
+    <a href="https://www.globus.org" target="_blank" rel="noopener"
+       style="color:#fff">globus.org</a></span>
+</div>
 <header>
   <h1>Globus Transfers Around the World</h1>
   <p>Fifteen years of research data on the move &mdash; <span id="hdr-sub">loading&hellip;</span>.
@@ -84,7 +101,7 @@
 </div>
 
 <div id="map"></div>
-<p class="hint">Countries shaded by total data volume moved (log scale). Brighter = more bytes.</p>
+<p class="hint">Countries shaded by total data volume moved (log scale). Darker = more bytes.</p>
 
 <div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
 <div class="grid" id="grid"></div>
@@ -127,8 +144,14 @@
 </dialog>
 
 <footer>
-  Data: Globus transfer logs, July 2010 &ndash; November 2025. Distances are great-circle;
-  locations are IP-level geolocation. Made with <a href="https://globus.org">Globus</a> usage data.
+  <p><a href="https://www.globus.org">Globus</a> is a non-profit service developed and
+     operated by the University of Chicago.</p>
+  <p style="max-width:680px;margin:10px auto">Globus thanks the US Department of Energy,
+     the National Science Foundation, the National Aeronautics and Space Administration,
+     the National Institutes of Health, and above all its more than 250 subscribers
+     worldwide for the support that has allowed us to develop and operate the service.</p>
+  <p>Data: Globus transfer logs, July 2010 &ndash; November 2025. Distances are great-circle;
+     locations are IP-level geolocation.</p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.js"></script>
@@ -201,8 +224,8 @@ fetch('manifest.json').then(r => r.json()).then(M => {
   new jsVectorMap({
     selector: '#map', map: 'world', backgroundColor: 'transparent',
     zoomButtons: true, zoomOnScroll: false,
-    regionStyle: { initial: { fill: '#1e2a52' }, hover: { fill: '#38bdf8' } },
-    visualizeData: { scale: ['#223067', '#f472b6'], values },
+    regionStyle: { initial: { fill: '#dfe6ee' }, hover: { fill: '#0074af' } },
+    visualizeData: { scale: ['#c9dff0', '#244b8b'], values },
     onRegionTooltipShow(event, tooltip, code) {
       const e = M[code];
       tooltip.text(e ? `${e.name}: ${fmtBytes(e.bytes)} — click to watch`
