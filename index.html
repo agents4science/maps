@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Globus Transfers Around the World</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.css">
 <style>
   :root {
     /* globus.org palette: navy header #244b8b, primary blue #0074af */
@@ -35,7 +34,10 @@
     border: 0; color: #fff; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
     border-radius: 999px; cursor: pointer; transition: transform .15s; }
   .featured button:hover { transform: scale(1.06); }
-  #map { width: min(1050px, 94vw); height: 520px; margin: 0 auto; }
+  #globe { width: min(1050px, 94vw); height: 580px; margin: 0 auto; }
+  .scene-tooltip { color: var(--text) !important; background: rgba(255,255,255,.93);
+    padding: 5px 11px; border-radius: 6px; border: 1px solid var(--line);
+    font-size: .85rem; }
   .hint { text-align: center; color: var(--muted); font-size: .85rem; margin: 6px 0 30px; }
   .search { display: flex; justify-content: center; margin: 10px 0 18px; }
   .search input { width: min(420px, 80vw); padding: 11px 18px; border-radius: 999px;
@@ -100,8 +102,9 @@
   <button id="btn-all">&#127757; Watch the Whole World</button>
 </div>
 
-<div id="map"></div>
-<p class="hint">Countries shaded by total data volume moved (log scale). Darker = more bytes.</p>
+<div id="globe"></div>
+<p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
+  arcs trace the 200 busiest routes &middot; click a country to watch its story.</p>
 
 <div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
 <div class="grid" id="grid"></div>
@@ -162,8 +165,7 @@
      locations are IP-level geolocation.</p>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/jsvectormap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/maps/world.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2"></script>
 <script>
 // Figure lightbox
 {
@@ -226,20 +228,65 @@ fetch('manifest.json').then(r => r.json()).then(M => {
   dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
   document.getElementById('btn-all').onclick = () => play('ALL');
 
-  // Choropleth world map
-  const values = {};
-  codes.forEach(c => { if (M[c].bytes > 0) values[c] = Math.log10(M[c].bytes); });
-  new jsVectorMap({
-    selector: '#map', map: 'world', backgroundColor: 'transparent',
-    zoomButtons: true, zoomOnScroll: false,
-    regionStyle: { initial: { fill: '#dfe6ee' }, hover: { fill: '#0074af' } },
-    visualizeData: { scale: ['#c9dff0', '#244b8b'], values },
-    onRegionTooltipShow(event, tooltip, code) {
-      const e = M[code];
-      tooltip.text(e ? `${e.name}: ${fmtBytes(e.bytes)} — click to watch`
-                     : `${tooltip.text()}: no recorded transfers`);
-    },
-    onRegionClick(event, code) { play(code); },
+  // 3D globe: countries shaded by volume, animated arcs for the busiest routes
+  Promise.all([
+    fetch('countries-110m.geojson').then(r => r.json()),
+    fetch('globe-arcs.json').then(r => r.json()),
+  ]).then(([world, G]) => {
+    const ISO_FIX = { France: 'FR', Norway: 'NO' };  // Natural Earth ISO_A2 = -99
+    const iso = f => f.properties.ISO_A2 !== '-99'
+      ? f.properties.ISO_A2 : (ISO_FIX[f.properties.ADMIN] || null);
+    const logB = c => M[c] && M[c].bytes > 0 ? Math.log10(M[c].bytes) : null;
+    const vals = codes.map(logB).filter(v => v !== null);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const mix = (a, b, t) => Math.round(a + (b - a) * t);
+    const shade = t =>  // #c9dff0 -> #244b8b, as elsewhere on the page
+      `rgb(${mix(201, 36, t)}, ${mix(223, 75, t)}, ${mix(240, 139, t)})`;
+    const capColor = f => {
+      const v = logB(iso(f));
+      return v === null ? '#e3eaf1' : shade((v - lo) / (hi - lo));
+    };
+    const alogs = G.arcs.map(a => Math.log10(a.b));
+    const alo = Math.min(...alogs), ahi = Math.max(...alogs);
+    const aT = b => (Math.log10(b) - alo) / (ahi - alo || 1);
+
+    const el = document.getElementById('globe');
+    const globe = Globe()(el)
+      .width(el.clientWidth).height(el.clientHeight)
+      .backgroundColor('rgba(0,0,0,0)')
+      .atmosphereColor('#9ec7e8').atmosphereAltitude(0.15)
+      .polygonsData(world.features)
+      .polygonAltitude(0.006)
+      .polygonCapColor(capColor)
+      .polygonSideColor(() => 'rgba(36, 75, 139, 0.12)')
+      .polygonStrokeColor(() => '#ffffff')
+      .polygonsTransitionDuration(0)
+      .polygonLabel(f => {
+        const e = M[iso(f)];
+        return e ? `<b>${e.name}</b><br>${fmtBytes(e.bytes)} moved &mdash; click to watch`
+                 : `${f.properties.ADMIN}: no recorded transfers`;
+      })
+      .onPolygonClick(f => { if (M[iso(f)]) play(iso(f)); })
+      .onPolygonHover(h => {
+        el.style.cursor = h && M[iso(h)] ? 'pointer' : '';
+        globe.polygonCapColor(f => h === f && M[iso(f)] ? '#0074af' : capColor(f));
+      })
+      .arcsData(G.arcs.map(a => ({ ...a,
+        startLat: G.centroids[a.s][0], startLng: G.centroids[a.s][1],
+        endLat: G.centroids[a.d][0], endLng: G.centroids[a.d][1] })))
+      .arcColor(() => ['rgba(0, 116, 175, 0.65)', 'rgba(36, 75, 139, 0.65)'])
+      .arcStroke(a => 0.1 + 0.55 * aT(a.b))
+      .arcDashLength(0.45).arcDashGap(2)
+      .arcDashAnimateTime(a => 6500 - 4500 * aT(a.b))
+      .arcLabel(a => `${(M[a.s] || {name: a.s}).name} &rarr; ${(M[a.d] || {name: a.d}).name}
+        <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`)
+      .pointOfView({ lat: 25, lng: -40, altitude: 1.9 });
+    globe.globeMaterial().color.set('#f2f7fb');
+    const ctl = globe.controls();
+    ctl.autoRotate = true;
+    ctl.autoRotateSpeed = 0.55;
+    ctl.enableZoom = false;
+    addEventListener('resize', () => globe.width(el.clientWidth));
   });
 
   // Searchable card grid, largest movers first
