@@ -104,7 +104,7 @@
 
 <div id="globe"></div>
 <p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
-  arcs trace the 200 busiest routes &middot; click a country to watch its story.</p>
+  arcs trace the 400 busiest city-to-city routes &middot; click a country to watch its story.</p>
 
 <div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
 <div class="grid" id="grid"></div>
@@ -272,13 +272,13 @@ fetch('manifest.json').then(r => r.json()).then(M => {
         globe.polygonCapColor(f => h === f && M[iso(f)] ? '#0074af' : capColor(f));
       })
       .arcsData(G.arcs.map(a => ({ ...a,
-        startLat: G.centroids[a.s][0], startLng: G.centroids[a.s][1],
-        endLat: G.centroids[a.d][0], endLng: G.centroids[a.d][1] })))
+        startLat: a.slat, startLng: a.slng,
+        endLat: a.dlat, endLng: a.dlng })))
       .arcColor(() => ['rgba(0, 116, 175, 0.65)', 'rgba(36, 75, 139, 0.65)'])
       .arcStroke(a => 0.1 + 0.55 * aT(a.b))
       .arcDashLength(0.45).arcDashGap(2)
       .arcDashAnimateTime(a => 6500 - 4500 * aT(a.b))
-      .arcLabel(a => `${(M[a.s] || {name: a.s}).name} &rarr; ${(M[a.d] || {name: a.d}).name}
+      .arcLabel(a => `${a.sn} &rarr; ${a.dn}
         <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`)
       .pointOfView({ lat: 25, lng: -40, altitude: 1.9 });
     globe.globeMaterial().color.set('#f2f7fb');
