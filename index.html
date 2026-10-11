@@ -128,7 +128,8 @@
 </div>
 <div id="globe"></div>
 <p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
-  arcs trace the 400 busiest city-to-city routes &middot; click a country to watch its story.</p>
+  arcs trace the 400 busiest city-to-city routes, plus each country's top three links &middot;
+  click a country to watch its story.</p>
 
 <div class="search"><input id="q" type="search" placeholder="Search for a country&hellip;"></div>
 <div class="grid" id="grid"></div>
@@ -270,9 +271,9 @@ fetch('manifest.json').then(r => r.json()).then(M => {
       const v = logB(iso(f));
       return v === null ? '#e3eaf1' : shade((v - lo) / (hi - lo));
     };
-    const alogs = G.arcs.map(a => Math.log10(a.b));
+    const alogs = G.arcs.filter(a => a.b > 0).map(a => Math.log10(a.b));
     const alo = Math.min(...alogs), ahi = Math.max(...alogs);
-    const aT = b => (Math.log10(b) - alo) / (ahi - alo || 1);
+    const aT = b => b > 0 ? (Math.log10(b) - alo) / (ahi - alo || 1) : 0;
 
     const el = document.getElementById('globe');
     const globe = Globe()(el)
@@ -312,7 +313,9 @@ fetch('manifest.json').then(r => r.json()).then(M => {
       .arcStroke(a => 0.1 + 0.55 * aT(a.b))
       .arcDashAnimateTime(a => 6500 - 4500 * aT(a.b))
       .arcLabel(a => `${a.sn} &rarr; ${a.dn}
-        <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`);
+        <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`
+        + (a.rep ? `<br><i>among the top routes for
+          ${a.rep.map(c => (M[c] || {name: c}).name).join(', ')}</i>` : ''));
     staticArcs();
 
     // ---- Replay: month-by-month city-pair animation.
