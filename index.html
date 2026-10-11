@@ -34,7 +34,10 @@
     border: 0; color: #fff; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
     border-radius: 999px; cursor: pointer; transition: transform .15s; }
   .featured button:hover { transform: scale(1.06); }
-  #globe { width: min(1050px, 94vw); height: 580px; margin: 0 auto; }
+  #globe { width: min(1050px, 94vw); height: 580px; margin: 0 auto; position: relative; }
+  #rp-big { position: absolute; top: 16px; right: 28px; z-index: 5; display: none;
+    font-size: 2.4rem; font-weight: 700; color: var(--navy); opacity: .8;
+    pointer-events: none; font-variant-numeric: tabular-nums; }
   .globe-controls { display: flex; justify-content: center; align-items: center;
     gap: 20px; flex-wrap: wrap; margin: 10px 0 0; }
   .seg button { background: #fff; border: 1px solid var(--line); color: var(--muted);
@@ -126,7 +129,7 @@
     <span id="rp-month"></span>
   </div>
 </div>
-<div id="globe"></div>
+<div id="globe"><div id="rp-big"></div></div>
 <p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
   arcs trace the 400 busiest city-to-city routes, plus each country's top three links &middot;
   click a country to watch its story.</p>
@@ -297,6 +300,11 @@ fetch('manifest.json').then(r => r.json()).then(M => {
         globe.polygonCapColor(f => h === f && M[iso(f)] ? '#0074af' : capColor(f));
       })
       .arcDashLength(0.45).arcDashGap(2)
+      .pointsMerge(false)
+      .pointColor(() => '#244b8b')
+      .pointAltitude(0.004)
+      .pointRadius(0.22)
+      .pointLabel(p => p.name)
       .pointOfView({ lat: 25, lng: -40, altitude: 1.9 });
     globe.globeMaterial().color.set('#f2f7fb');
     const ctl = globe.controls();
@@ -307,7 +315,14 @@ fetch('manifest.json').then(r => r.json()).then(M => {
 
     const STATIC = G.arcs.map(a => ({ ...a,
       startLat: a.slat, startLng: a.slng, endLat: a.dlat, endLng: a.dlng }));
+    const seenPt = new Map();
+    G.arcs.forEach(a => {
+      seenPt.set(a.sn, [a.slat, a.slng]);
+      seenPt.set(a.dn, [a.dlat, a.dlng]);
+    });
+    const STATIC_PTS = [...seenPt].map(([n, ll]) => ({ name: n, lat: ll[0], lng: ll[1] }));
     const staticArcs = () => globe
+      .pointsData(STATIC_PTS)
       .arcsData(STATIC)
       .arcColor(() => ['rgba(0, 116, 175, 0.65)', 'rgba(36, 75, 139, 0.65)'])
       .arcStroke(a => 0.1 + 0.55 * aT(a.b))
@@ -367,6 +382,7 @@ fetch('manifest.json').then(r => r.json()).then(M => {
             <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`
             + (a.r > 0 ? ` &middot; ${fmtBytes(a.r)}/s` : ''));
         monthLbl.textContent = mLabel(R.months[cur].m);
+        document.getElementById('rp-big').textContent = mLabel(R.months[cur].m);
         scrub.value = rp.t;
       }
       function step(ts) {
@@ -393,7 +409,11 @@ fetch('manifest.json').then(r => r.json()).then(M => {
         btnRoutes.classList.toggle('active', !replay);
         btnReplay.classList.toggle('active', replay);
         document.getElementById('replay-ctl').hidden = !replay;
-        if (replay) { render(); play(); } else { pause(); staticArcs(); }
+        document.getElementById('rp-big').style.display = replay ? 'block' : 'none';
+        if (replay) {
+          globe.pointsData(R.cities.map(c => ({ name: c[0], lat: c[1], lng: c[2] })));
+          render(); play();
+        } else { pause(); staticArcs(); }
       }
       playBtn.onclick = () => rp.playing ? pause() : play();
       scrub.oninput = e => { pause(); rp.t = +e.target.value; render(); };
