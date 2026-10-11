@@ -35,6 +35,19 @@
     border-radius: 999px; cursor: pointer; transition: transform .15s; }
   .featured button:hover { transform: scale(1.06); }
   #globe { width: min(1050px, 94vw); height: 580px; margin: 0 auto; }
+  .globe-controls { display: flex; justify-content: center; align-items: center;
+    gap: 20px; flex-wrap: wrap; margin: 10px 0 0; }
+  .seg button { background: #fff; border: 1px solid var(--line); color: var(--muted);
+    padding: 7px 16px; cursor: pointer; font-size: .9rem; }
+  .seg button:first-child { border-radius: 999px 0 0 999px; }
+  .seg button:last-child { border-radius: 0 999px 999px 0; margin-left: -1px; }
+  .seg button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .replay-ctl { display: flex; align-items: center; gap: 10px; }
+  #rp-play { background: var(--accent); color: #fff; border: 0; border-radius: 50%;
+    width: 34px; height: 34px; cursor: pointer; font-size: .85rem; }
+  #rp-scrub { width: min(320px, 50vw); accent-color: var(--accent); }
+  #rp-month { color: var(--muted); font-size: .9rem; min-width: 72px;
+    font-variant-numeric: tabular-nums; }
   .scene-tooltip { color: var(--text) !important; background: rgba(255,255,255,.93);
     padding: 5px 11px; border-radius: 6px; border: 1px solid var(--line);
     font-size: .85rem; }
@@ -102,6 +115,17 @@
   <button id="btn-all">&#127757; Watch the Whole World</button>
 </div>
 
+<div class="globe-controls">
+  <div class="seg">
+    <button id="mode-routes" class="active">Busiest routes</button>
+    <button id="mode-replay">Replay 15 years</button>
+  </div>
+  <div class="replay-ctl" id="replay-ctl" hidden>
+    <button id="rp-play" aria-label="Play or pause">&#9654;</button>
+    <input id="rp-scrub" type="range" min="0" max="184" value="0" step="0.01">
+    <span id="rp-month"></span>
+  </div>
+</div>
 <div id="globe"></div>
 <p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
   arcs trace the 400 busiest city-to-city routes &middot; click a country to watch its story.</p>
@@ -271,15 +295,7 @@ fetch('manifest.json').then(r => r.json()).then(M => {
         el.style.cursor = h && M[iso(h)] ? 'pointer' : '';
         globe.polygonCapColor(f => h === f && M[iso(f)] ? '#0074af' : capColor(f));
       })
-      .arcsData(G.arcs.map(a => ({ ...a,
-        startLat: a.slat, startLng: a.slng,
-        endLat: a.dlat, endLng: a.dlng })))
-      .arcColor(() => ['rgba(0, 116, 175, 0.65)', 'rgba(36, 75, 139, 0.65)'])
-      .arcStroke(a => 0.1 + 0.55 * aT(a.b))
       .arcDashLength(0.45).arcDashGap(2)
-      .arcDashAnimateTime(a => 6500 - 4500 * aT(a.b))
-      .arcLabel(a => `${a.sn} &rarr; ${a.dn}
-        <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`)
       .pointOfView({ lat: 25, lng: -40, altitude: 1.9 });
     globe.globeMaterial().color.set('#f2f7fb');
     const ctl = globe.controls();
@@ -287,6 +303,105 @@ fetch('manifest.json').then(r => r.json()).then(M => {
     ctl.autoRotateSpeed = 0.55;
     ctl.enableZoom = false;
     addEventListener('resize', () => globe.width(el.clientWidth));
+
+    const STATIC = G.arcs.map(a => ({ ...a,
+      startLat: a.slat, startLng: a.slng, endLat: a.dlat, endLng: a.dlng }));
+    const staticArcs = () => globe
+      .arcsData(STATIC)
+      .arcColor(() => ['rgba(0, 116, 175, 0.65)', 'rgba(36, 75, 139, 0.65)'])
+      .arcStroke(a => 0.1 + 0.55 * aT(a.b))
+      .arcDashAnimateTime(a => 6500 - 4500 * aT(a.b))
+      .arcLabel(a => `${a.sn} &rarr; ${a.dn}
+        <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`);
+    staticArcs();
+
+    // ---- Replay: month-by-month city-pair animation.
+    // Arcs linger (fading) for LINGER months beyond their month — an
+    // exaggerated lifetime, since real transfers would be invisible at
+    // ~5-million-fold time compression. Width: bytes. Color + pulse: rate.
+    fetch('globe-months.json').then(r => r.json()).then(R => {
+      const N = R.months.length, LINGER = 4, SPEED = 2.0; // months/sec
+      const recs = R.months.map((mo, mi) => mo.arcs.map(a => ({
+        mi, sn: R.cities[a[0]][0], dn: R.cities[a[1]][0],
+        startLat: R.cities[a[0]][1], startLng: R.cities[a[0]][2],
+        endLat: R.cities[a[1]][1], endLng: R.cities[a[1]][2],
+        t: a[2], b: a[3], r: a[4], alpha: 0.75,
+      })));
+      const all = recs.flat();
+      const span = (vs, f) => { const xs = vs.filter(v => v > 0).map(f);
+        return [Math.min(...xs), Math.max(...xs)]; };
+      const [rlo, rhi] = span(all.map(a => a.r), Math.log10);
+      const [blo, bhi] = span(all.map(a => a.b), Math.log10);
+      const rT = r => r > 0 ? (Math.log10(r) - rlo) / (rhi - rlo || 1) : 0;
+      const bT = b => (Math.log10(b) - blo) / (bhi - blo || 1);
+      // slow blue #0074af -> fast pink #e83e8c
+      const rcol = (r, al) => `rgba(${mix(0, 232, rT(r))}, ${mix(116, 62, rT(r))},
+        ${mix(175, 140, rT(r))}, ${al})`;
+      const mLabel = m => new Date(m + '-15').toLocaleString('en',
+        { month: 'short', year: 'numeric' });
+
+      const rp = { playing: false, t: 0, last: 0, lastDraw: 0, raf: 0 };
+      const scrub = document.getElementById('rp-scrub');
+      const monthLbl = document.getElementById('rp-month');
+      const playBtn = document.getElementById('rp-play');
+      const btnRoutes = document.getElementById('mode-routes');
+      const btnReplay = document.getElementById('mode-replay');
+      scrub.max = N - 1;
+
+      function render() {
+        const cur = Math.min(Math.floor(rp.t), N - 1);
+        const active = [];
+        for (let mi = Math.max(0, cur - LINGER + 1); mi <= cur; mi++) {
+          const al = Math.max(0.08, 0.75 * (1 - (rp.t - mi) / LINGER));
+          for (const a of recs[mi]) { a.alpha = al; active.push(a); }
+        }
+        globe
+          .arcsData(active)
+          .arcColor(a => [rcol(a.r, a.alpha), rcol(a.r, a.alpha * 0.45)])
+          .arcStroke(a => 0.08 + 0.5 * bT(a.b))
+          .arcDashAnimateTime(a => 7000 - 5500 * rT(a.r))
+          .arcLabel(a => `${a.sn} &rarr; ${a.dn} (${mLabel(R.months[a.mi].m)})
+            <br>${fmtNum(a.t)} transfers &middot; ${fmtBytes(a.b)}`
+            + (a.r > 0 ? ` &middot; ${fmtBytes(a.r)}/s` : ''));
+        monthLbl.textContent = mLabel(R.months[cur].m);
+        scrub.value = rp.t;
+      }
+      function step(ts) {
+        if (!rp.playing) return;
+        rp.t += (ts - rp.last) / 1000 * SPEED;
+        rp.last = ts;
+        if (rp.t >= N - 1) { rp.t = N - 1; render(); pause(); return; }
+        if (ts - rp.lastDraw > 120) { rp.lastDraw = ts; render(); }
+        rp.raf = requestAnimationFrame(step);
+      }
+      function play() {
+        if (rp.t >= N - 1) rp.t = 0;
+        rp.playing = true;
+        playBtn.innerHTML = '&#10074;&#10074;';
+        rp.last = performance.now();
+        rp.raf = requestAnimationFrame(step);
+      }
+      function pause() {
+        rp.playing = false;
+        playBtn.innerHTML = '&#9654;';
+        cancelAnimationFrame(rp.raf);
+      }
+      function setMode(replay) {
+        btnRoutes.classList.toggle('active', !replay);
+        btnReplay.classList.toggle('active', replay);
+        document.getElementById('replay-ctl').hidden = !replay;
+        if (replay) { render(); play(); } else { pause(); staticArcs(); }
+      }
+      playBtn.onclick = () => rp.playing ? pause() : play();
+      scrub.oninput = e => { pause(); rp.t = +e.target.value; render(); };
+      btnRoutes.onclick = () => setMode(false);
+      btnReplay.onclick = () => setMode(true);
+      const q = new URLSearchParams(location.search);
+      if (q.get('replay')) {
+        setMode(true);
+        if (q.get('month') !== null) { pause(); rp.t = Math.min(N - 1, +q.get('month')); render(); }
+      }
+    });
   });
 
   // Searchable card grid, largest movers first
