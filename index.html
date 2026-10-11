@@ -34,10 +34,15 @@
     border: 0; color: #fff; font-size: 1.05rem; font-weight: 700; padding: 13px 26px;
     border-radius: 999px; cursor: pointer; transition: transform .15s; }
   .featured button:hover { transform: scale(1.06); }
-  #globe { width: min(1050px, 94vw); height: 580px; margin: 0 auto; position: relative; }
+  #globe-wrap { width: min(1050px, 94vw); margin: 0 auto; position: relative; }
+  #globe { width: 100%; height: 580px; }
   #rp-big { position: absolute; top: 16px; right: 28px; z-index: 5; display: none;
     font-size: 2.4rem; font-weight: 700; color: var(--navy); opacity: .8;
     pointer-events: none; font-variant-numeric: tabular-nums; }
+  #spin-chip { position: absolute; bottom: 14px; right: 18px; z-index: 5; display: none;
+    background: #fff; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 6px 14px; font-size: .85rem; cursor: pointer; }
+  #spin-chip:hover { color: var(--accent); border-color: var(--accent); }
   .globe-controls { display: flex; justify-content: center; align-items: center;
     gap: 20px; flex-wrap: wrap; margin: 10px 0 0; }
   .seg button { background: #fff; border: 1px solid var(--line); color: var(--muted);
@@ -129,8 +134,13 @@
     <span id="rp-month"></span>
   </div>
 </div>
-<div id="globe"><div id="rp-big"></div></div>
-<p class="hint">Drag to spin &middot; countries shaded by data volume (darker = more) &middot;
+<div id="globe-wrap">
+  <div id="globe"></div>
+  <div id="rp-big"></div>
+  <button id="spin-chip">&#8635; resume spin</button>
+</div>
+<p class="hint">Click or drag the globe to pause the spin &middot;
+  countries shaded by data volume (darker = more) &middot;
   arcs trace the 400 busiest city-to-city routes, plus every country's top links
   (more for busier countries) &middot;
   click a country to watch its story.</p>
@@ -313,6 +323,18 @@ fetch('manifest.json').then(r => r.json()).then(M => {
     ctl.autoRotateSpeed = 0.55;
     ctl.enableZoom = false;
     addEventListener('resize', () => globe.width(el.clientWidth));
+
+    // Any click/drag on the globe pauses the spin so a country or arc can be
+    // picked at rest; a chip on the globe resumes it.
+    const spinChip = document.getElementById('spin-chip');
+    el.addEventListener('pointerdown', () => {
+      if (ctl.autoRotate) { ctl.autoRotate = false; spinChip.style.display = 'block'; }
+    });
+    spinChip.onclick = e => {
+      e.stopPropagation();
+      ctl.autoRotate = true;
+      spinChip.style.display = 'none';
+    };
 
     const STATIC = G.arcs.map(a => ({ ...a,
       startLat: a.slat, startLng: a.slng, endLat: a.dlat, endLng: a.dlng }));
