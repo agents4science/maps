@@ -92,7 +92,8 @@
   .dlg-head button { background: none; border: 0; color: var(--muted); font-size: 1.6rem; cursor: pointer; }
   dialog video { width: 100%; display: block; background: #000; }
   .dlg-stats { padding: 10px 18px 16px; color: var(--muted); font-size: .9rem; }
-  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 26px; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 26px 0; }
+  footer p { max-width: min(1100px, 94vw); margin: 9px auto; }
   footer a { color: var(--accent); }
 </style>
 </head>
@@ -188,11 +189,11 @@
 <footer>
   <p><a href="https://www.globus.org">Globus</a> is a non-profit service developed and
      operated by the University of Chicago.</p>
-  <p style="max-width:680px;margin:10px auto">Globus thanks the US Department of Energy,
+  <p>Globus thanks the US Department of Energy,
      the National Science Foundation, the National Aeronautics and Space Administration,
      the National Institutes of Health, and above all its more than 250 subscribers
      worldwide for the support that has allowed us to develop and operate the service.</p>
-  <p style="max-width:680px;margin:10px auto"><strong>A note on coverage.</strong>
+  <p><strong>A note on coverage.</strong>
      The transfer logs record 59.4 million transfers moving 131 billion files and
      3.6 exabytes. IP addresses are not recorded for Globus Connect Personal endpoints
      &mdash; laptops and personal machines &mdash; so only transfers with an IP recorded
